@@ -1,5 +1,5 @@
 '''
-Tensor flow is a google open source deep learning library for implementing various complex deep learning algorithms in few line of code.
+Tensor flow is a google open source deep learning library for implementing various complex deep learning algorithms in few lines of code.
 This is based on the concepts of ANN (Artificial neural networks). The theory for Neural networks will be uploaded soon.
 Below is the quick start guide for begineers to start with tensorflow programming.
 '''
