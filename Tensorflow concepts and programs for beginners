@@ -166,3 +166,140 @@ def train_nn_model(x):
 				print('Accuracy of neural net: ', accuracy.eval({x:mnist.test.images,y:mnist.test.labels}))
 
 train_nn_model(x)
+
+################################################### prog 4 ################################################
+'''
+The below program converts the input file into tensors and further can be used for sentiment analysis.
+Converting the text data into tensors for tensorflow Neural network to process:
+
+1) All the words must be assigned some number which will represent in the form of arrays so that it can be converted into tensors for tensorflow to process.
+
+2) We'll be creating a lexicon i.e dictionary of words.
+
+3) Ex: if our lexicon is [cat,dog,chair] and 
+our sentence is : The cat and dog are hiding behing the chair.
+In this case the vector for the above sentence is 
+[1,1,1] because all the worlds from [cat,dog,chair] is present in the sentence 
+"The cat and dog are hiding behing the chair"
+
+Another example :
+
+if our lexicon is [car,man,women,spaceship]
+our sentence is : A man is driving a car.
+vector representation of the above sentence using lexicon:
+[1,1,0,0] because car and man are present in the sentence.
+'''
+
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+import numpy as np 
+import random
+import pickle
+from collections import Counter
+
+lemmatizer= WordNetLemmatizer()
+no_of_lines= 100000
+
+def create_lexicon(pos,neg):
+	lexicon =[]
+
+	# loop going through pos and neg keywords representing type of data
+	for file in [pos,neg]:
+		with open(file,'r') as f:
+			contents= f.readlines() # reading the file and placing the content in a single line which is stored in a list
+			for l in contents[:no_of_lines]:
+				token_words= word_tokenize(l.lower())
+				lexicon+=token_words
+
+	'''need to lemmitize the words which are now present in lexicon 
+	(need only the words which don't have ing etc.. ex: eat-ing so need eat)'''
+	lexicon= [lemmatizer.lemmatize(i) for i in lexicon]
+	
+	# counter will count each word present in lexicon and will return dictionary ex: {I:232, hello:442 , end: 342, eat: 863}
+	word_count= Counter(lexicon)
+
+	'''creating final lexicon in which we will keep only those words which are no so frequent because chances are that if we don't 
+	exclude the frequent words we'll end up including words in lexicon like 'is','was','i','am' whose meanings are not important'''
+
+	final_lexicon=[]
+	for i in word_count:
+		if 7000>word_count[i]>20: # this included the words whose occurance is less than 7000 but more than 20 in lexicon.
+			final_lexicon.append(i)
+	return final_lexicon
+
+# the below function is used to create features of data based in the form of arrays.
+def feature_creation(sample,lexicon,classification):
+	featureset=[]
+
+	# reading and storing the content of sample passed in this function
+	with open(sample,'r') as f:
+		content= f.readlines()
+
+	# the below code is used to perform tokenization and lemmitization on the words present in content.
+		for j in content[:no_of_lines]:
+			current_words= word_tokenize(j.lower())
+			current_words =[lemmatizer.lemmatize(i) for i in current_words]
+			# for text analysis the number of features are actually the no. of lexicons.
+			features = np.zeros(len(lexicon))
+
+		# logic to check the words in lexicon , if yes then get the index of it and assign 1 on that position.
+
+		for w in current_words:
+			if w.lower() in lexicon:
+				index_value= lexicon.index(w.lower())
+				features[index_value]+=1
+		features= list(features)
+		featuresets=[]
+		# creating a list by the combination of features and classification 
+		#( for +ive classification will be [1,0] for -ive will be [0,1])
+		featuresets.append([features,classification])
+
+	return featuresets
+
+# The below function is used to return the training and testing variables based on the lexicons and features.
+def train_test_func(pos,neg,test_size=0.01):
+	lexicon= create_lexicon('pos.txt','neg.txt')
+	features = []
+	features+=feature_creation('pos.txt',lexicon,[1,0])
+	features+=feature_creation('neg.txt',lexicon,[0,1])
+
+	# converting features into numpy array
+	features=np.array(features)
+
+	# creating the testing size 
+	testing_size = int(test_size*len(features))
+
+	# creating training values:
+	train_x = list (features[:,0][:-testing_size])
+	train_y = list (features[:,1][:-testing_size])
+
+	# creating testing values:
+	test_x = list (features[:,0][-testing_size:])
+	test_y = list (features[:,1][-testing_size:])
+
+	return train_x,train_y,test_x,test_y
+
+if __name__=="__main__":
+	train_x,train_y,test_x,test_y=train_test_func('pos.txt','neg.txt')
+	with open ('sentiment_pickle.pickle','wb') as f:
+		pickle.dump([train_x,train_y,test_x,test_y],f)
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
