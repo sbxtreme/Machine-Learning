@@ -189,6 +189,37 @@ our sentence is : A man is driving a car.
 vector representation of the above sentence using lexicon:
 [1,1,0,0] because car and man are present in the sentence.
 '''
+'''
+Overview of Code:
+*****************
+1) Words can be converted into tensors using lexicons and word lemmitizer
+2) We read the sample of complete file which contains positive / negative words.
+3) We create 3 important modules:
+>> create lexicons
+>> create features
+>> create training and testing sets
+
+a)Create lexicons:
+b)Read sample
+c)Do tokenization and Lemitization 
+d)The words which are appeared more in numbers in the sample should be ignored (to ignore unnecessary words like in,was,were etc to be excluded in lexicon)
+e)Create features using : Number of features = lenght of lexicon.
+f)Logic for creating features:
+If my word from the sample falls in lexicon so get the index value of lexicon and add one to the index in the feature list.
+g)for featureset ( combination of features and classification ) will be created.
+h)To create train test sample 
+> create a testing size 0.01 (10%) of total features
+> extract 90% data from featuresets as training set for both positive and negative classification.
+> extract 10% data from featuresets as testing set for both positive and negative classification.
+i)Store the training and testing set in a pickle as use them directly in the main neural network program.
+
+
+In order to run the neural network for sentiment analysis , some minor modifications are required in the core neural network code mentioned under program 3.
+'''
+
+
+
+
 
 import nltk
 from nltk.tokenize import word_tokenize
