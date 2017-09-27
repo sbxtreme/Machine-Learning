@@ -220,103 +220,198 @@ In order to run the neural network for sentiment analysis , some minor modificat
 
 
 
-
 import nltk
 from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer
-import numpy as np 
+import numpy as np
 import random
 import pickle
 from collections import Counter
+from nltk.stem import WordNetLemmatizer
 
-lemmatizer= WordNetLemmatizer()
-no_of_lines= 100000
+lemmatizer = WordNetLemmatizer()
+hm_lines = 100000
 
 def create_lexicon(pos,neg):
-	lexicon =[]
 
-	# loop going through pos and neg keywords representing type of data
-	for file in [pos,neg]:
-		with open(file,'r') as f:
-			contents= f.readlines() # reading the file and placing the content in a single line which is stored in a list
-			for l in contents[:no_of_lines]:
-				token_words= word_tokenize(l.lower())
-				lexicon+=token_words
+	lexicon = []
+	with open(pos,'r') as f:
+		contents = f.readlines()
+		for l in contents[:hm_lines]:
+			all_words = word_tokenize(l)
+			lexicon += list(all_words)
 
-	'''need to lemmitize the words which are now present in lexicon 
-	(need only the words which don't have ing etc.. ex: eat-ing so need eat)'''
-	lexicon= [lemmatizer.lemmatize(i) for i in lexicon]
-	
-	# counter will count each word present in lexicon and will return dictionary ex: {I:232, hello:442 , end: 342, eat: 863}
-	word_count= Counter(lexicon)
+	with open(neg,'r') as f:
+		contents = f.readlines()
+		for l in contents[:hm_lines]:
+			all_words = word_tokenize(l)
+			lexicon += list(all_words)
 
-	'''creating final lexicon in which we will keep only those words which are no so frequent because chances are that if we don't 
-	exclude the frequent words we'll end up including words in lexicon like 'is','was','i','am' whose meanings are not important'''
+	lexicon = [lemmatizer.lemmatize(i) for i in lexicon]
+	w_counts = Counter(lexicon)
+	l2 = []
+	for w in w_counts:
+		#print(w_counts[w])
+		if 1000 > w_counts[w] > 50:
+			l2.append(w)
+	print(len(l2))
+	return l2
 
-	final_lexicon=[]
-	for i in word_count:
-		if 7000>word_count[i]>20: # this included the words whose occurance is less than 7000 but more than 20 in lexicon.
-			final_lexicon.append(i)
-	return final_lexicon
+def sample_handling(sample,lexicon,classification):
 
-# the below function is used to create features of data based in the form of arrays.
-def feature_creation(sample,lexicon,classification):
-	featureset=[]
+	featureset = []
 
-	# reading and storing the content of sample passed in this function
 	with open(sample,'r') as f:
-		content= f.readlines()
-
-	# the below code is used to perform tokenization and lemmitization on the words present in content.
-		for j in content[:no_of_lines]:
-			current_words= word_tokenize(j.lower())
-			current_words =[lemmatizer.lemmatize(i) for i in current_words]
-			# for text analysis the number of features are actually the no. of lexicons.
+		contents = f.readlines()
+		for l in contents[:hm_lines]:
+			current_words = word_tokenize(l.lower())
+			current_words = [lemmatizer.lemmatize(i) for i in current_words]
 			features = np.zeros(len(lexicon))
+			for word in current_words:
+				if word.lower() in lexicon:
+					index_value = lexicon.index(word.lower())
+					features[index_value] += 1
 
-		# logic to check the words in lexicon , if yes then get the index of it and assign 1 on that position.
+			features = list(features)
+			featureset.append([features,classification])
+			print(len(featureset))
+	return featureset
 
-		for w in current_words:
-			if w.lower() in lexicon:
-				index_value= lexicon.index(w.lower())
-				features[index_value]+=1
-		features= list(features)
-		featuresets=[]
-		# creating a list by the combination of features and classification 
-		#( for +ive classification will be [1,0] for -ive will be [0,1])
-		featuresets.append([features,classification])
-
-	return featuresets
-
-# The below function is used to return the training and testing variables based on the lexicons and features.
-def train_test_func(pos,neg,test_size=0.01):
-	lexicon= create_lexicon('pos.txt','neg.txt')
+def create_feature_sets_and_labels(pos,neg,test_size = 0.1):
+	lexicon = create_lexicon(pos,neg)
 	features = []
-	features+=feature_creation('pos.txt',lexicon,[1,0])
-	features+=feature_creation('neg.txt',lexicon,[0,1])
+	features += sample_handling('pos.txt',lexicon,[1,0])
+	features += sample_handling('neg.txt',lexicon,[0,1])
+	random.shuffle(features)
+	features = np.array(features)
 
-	# converting features into numpy array
-	features=np.array(features)
-
-	# creating the testing size 
 	testing_size = int(test_size*len(features))
+	print(testing_size)
 
-	# creating training values:
-	train_x = list (features[:,0][:-testing_size])
-	train_y = list (features[:,1][:-testing_size])
-
-	# creating testing values:
-	test_x = list (features[:,0][-testing_size:])
-	test_y = list (features[:,1][-testing_size:])
+	train_x = list(features[:,0][:-testing_size])
+	train_y = list(features[:,1][:-testing_size])
+	test_x = list(features[:,0][-testing_size:])
+	test_y = list(features[:,1][-testing_size:])
 
 	return train_x,train_y,test_x,test_y
 
-if __name__=="__main__":
-	train_x,train_y,test_x,test_y=train_test_func('pos.txt','neg.txt')
-	with open ('sentiment_pickle.pickle','wb') as f:
-		pickle.dump([train_x,train_y,test_x,test_y],f)
-		
 
+if __name__ == '__main__':
+	train_x,train_y,test_x,test_y = create_feature_sets_and_labels('pos.txt','neg.txt')
+	# if you want to pickle this data:
+	with open('/sentiment_set.pickle','wb') as f:
+		pickle.dump([train_x,train_y,test_x,test_y],f)
+
+
+################################################## NN for sentiment analysis #######################################################
+
+import tensorflow as tf
+import numpy as np
+from sent_funcs import create_feature_sets_and_labels
+train_x,train_y,test_x,test_y=create_feature_sets_and_labels('pos.txt','neg.txt')
+
+# creating nodes for 3 layes :
+
+n_nodes_l1=700
+n_nodes_l2=700
+n_nodes_l3=700
+
+#the system will take 100 images in a batch and will process
+batch_size =100
+
+# number of classes i.e need to identify the sentiments which will be positive or negative so 2
+n_classes=2
+
+# placeholder 
+# here the images which we are going to process is of 28x28 pixels
+x= tf.placeholder('float')
+y= tf.placeholder('float')
+
+# creating a neural network model.
+
+# we always use [(input data*weight) + bias] for each layer. The use of bias is in case of i/p*weight = 0 so to trigger the o/p using activation function.
+def nn_model(data):
+	# defining the properties of hidden layer 1 using weight and bias. Here len(train_x[0]) 
+	# means that the number of i/p i.e train_x=[[1,1,1,1,1],[1,2,3,4,5],[3,2,2,2,1]] so len(train_x[0]) = 5 for [1,1,1,1,1]
+	hidden_l1={'weight': tf.Variable(tf.random_normal([len(train_x[0]),n_nodes_l1])),
+				 'bias': tf.Variable(tf.random_normal([n_nodes_l1]))
+				 }	
+
+	hidden_l2={'weight': tf.Variable(tf.random_normal([n_nodes_l1,n_nodes_l2])),
+				 'bias': tf.Variable(tf.random_normal([n_nodes_l2]))
+				 }	
+
+	hidden_l3={'weight': tf.Variable(tf.random_normal([n_nodes_l2,n_nodes_l3])),
+				 'bias': tf.Variable(tf.random_normal([n_nodes_l3]))
+				 }	
+
+	output_l1={'weight': tf.Variable(tf.random_normal([n_nodes_l3,n_classes])),
+				 'bias': tf.Variable(tf.random_normal([n_classes]))
+				 }	
+
+ 	# creating the flow of data (input_data*weight)+bias
+
+	l1=tf.add(tf.matmul(data,hidden_l1['weight']),hidden_l1['bias'])
+ 	# now passing through activation function.
+	l1=tf.nn.relu(l1)
+
+	l2= tf.add(tf.matmul(l1,hidden_l2['weight']),hidden_l2['bias'])
+ 	# now passing through activation function.
+	l2=tf.nn.relu(l2)
+
+	l3= tf.add(tf.matmul(l2,hidden_l3['weight']),hidden_l3['bias'])
+ 	# now passing through activation function.
+	l3=tf.nn.relu(l3)
+
+	output = tf.matmul(l3,output_l1['weight'])+ output_l1['bias']
+
+	return output
+
+	# creating a function to train neural network model:
+
+def train_nn_model(x):
+
+		prediction = nn_model(x)
+		# the below cost function calculates the difference between the prediction we got and the known value of y.
+		cost=tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = prediction, labels=y))
+		# Inorder to reduce the cost function we'll be using the optimizer. 
+		# The below optimizer is based on gradiant decent concept.The adam optimizer has parameter learning rate and default is 0.001
+		optimizer= tf.train.AdamOptimizer().minimize(cost)
+		# this is combination of feed forward and back propogation so total movement across nn would be 20
+		nn_epochs=10
+
+		# creating a session to run the model
+		with tf.Session() as sess:
+			sess.run(tf.initialize_all_variables())
+
+			# the below code is training the model and optimizing the weights to reduce the error in every cycle.
+			for i in range(nn_epochs):
+				epoch_loss=0 # variable to calculate the loss after each cycle, initialize with 0
+				
+				# logic to create a batch: ( dividing the complete data in batches of 100)
+				
+				m=0
+				while m < len(train_x):
+					start = m
+					end = m+batch_size
+					batch_x = np.array(train_x[start:end])
+					batch_y = np.array(train_y[start:end])
+					m+=batch_size
+
+				# logic to create a batch ends
+
+					j,c=sess.run([optimizer,cost],feed_dict={x:batch_x,y:batch_y})
+					epoch_loss+=c
+					print(i,' epoch completed out of ',nn_epochs, ' and loss is ',epoch_loss)
+
+				# this will return the index of maximum values in these arrays.
+				# it means one hot and rest 0 based on the pixels and will tell that both are identical.
+				correct = tf.equal(tf.argmax(prediction,1),tf.argmax(y,1))
+				# calculating the accuracy:
+				accuracy = tf.reduce_mean(tf.cast(correct,'float'))
+				# the below code is performing the testing accuracy of model.
+				print('Accuracy of neural net: ', accuracy.eval({x:test_x,y:test_y}))
+
+train_nn_model(x)
 
 
 
